@@ -2,66 +2,68 @@ import sys
 import gurobipy as gp
 from gurobipy import GRB
 
+def ler_input(file_path):
+    """
+    Lê os dados do problema de múltiplas mochilas a partir de um arquivo de entrada.
 
-def read_input(file_path):
-    # Lê os dados do problema
+    Args:
+        file_path (str): caminho para o arquivo de entrada formatado
+
+    Returns:
+        int, int, list[float], list[tuple]: Numero de itens (n) e mochilas (m), capacidade de cada mochila (c) e lista de itens [(beneficio,peso)]
+    """
     with open(file_path, 'r') as f:
-        # Lê o número de itens (n) e de mochilas (m)
+        itens = []
         n, m = map(int, f.readline().strip().split())
+        c = list(map(float, f.readline().strip().split()))
         
-        # Lê as capacidades das mochilas
-        capacities = list(map(float, f.readline().strip().split()))
-        
-        # Lê os benefícios e pesos dos itens e guarda na lista items
-        items = []
         for _ in range(n):
-            benefit, weight = map(float, f.readline().strip().split())
-            items.append((benefit, weight))
+            beneficio, peso = map(float, f.readline().strip().split())
+            itens.append((beneficio, peso))
             
-    return n,m,capacities, items
+    return n,m,c, itens
 
-def mochila_inteira(n,m,capacities,items):
-    # Criação do modelo
+def mochila_inteira(n,m,c,itens):
+    """
+    Aplicação no Gurobi do problema lido e print de sua solução. 
+
+    Args:
+        n (int): Numero de itens
+        m (int): Numero de mochilas
+        c (list[float]): Capacidade das m mochilas
+        itens (list[tuple]): beneficio e peso de cada item
+        
+    Print: 
+        Valor da Função Objetivo.
+        Itens da Mochila m: [itens].
+    """
     model = gp.Model("problema_mochilas")
     
-    # Criação das variáveis de decisão x[i, j]
+    # Criação das variáveis de decisão x[i, j].
     x = model.addVars(n, m, vtype=GRB.BINARY, name="x")
-    
-    # Função objetivo: maximizar a soma dos benefícios que é o indice 0 na lista de itens 
-    model.setObjective(gp.quicksum(items[i][0] * x[i,j] for i in range(n) for j in range(m)), GRB.MAXIMIZE)
-    
-    # Restrição 1: A soma dos pesos dos itens em cada mochila deve ser menor ou igual à capacidade
-    model.addConstrs((gp.quicksum(items[i][1] * x[i,j] for i in range(n)) <= capacities[j] for j in range(m)), name="capacity")
-    
-    # Restrição 2: Cada item só pode ser colocado em uma mochila
+    # Aplicação da função objetivo multiplicando o beneficio dos itens pela sua presença ou não na mochila(0,1).
+    model.setObjective(gp.quicksum(itens[i][0] * x[i,j] for i in range(n) for j in range(m)), GRB.MAXIMIZE)
+    # Restrição da capacidade multiplicando o peso do item pela presença do mesmo definindo como menor ou igual.
+    model.addConstrs((gp.quicksum(itens[i][1] * x[i,j] for i in range(n)) <= c[j] for j in range(m)), name="capacity")
+    # Restrição para a singularidade de itens na mochila.
     model.addConstrs((gp.quicksum(x[i,j] for j in range(m)) <= 1 for i in range(n)), name="item_assignment")
     
-    # Otimiza o modelo
     model.optimize()
     
     # Exibe a solução ótima
     if model.status == GRB.OPTIMAL:
-        print("---------------------------------------------------")
+        print("\n---------------------------------------------------")
         print("Solução Ótima")
         print("---------------------------------------------------")
         print(f"Valor da Função Objetivo: {model.objVal}")
-        for j in range(m):
-            mochila = [i for i in range(n) if x[i,j].x > 0.5]
-            print(f"Itens da Mochila {j}: {mochila}")
-    else:
-        print("Nenhuma solução ótima encontrada.")
+        for i in range(m):
+            mochila = [j for j in range(n) if x[j,i].x >= 1]
+            print(f"Itens da Mochila {i+1}: {mochila}")
+
     
 
 
 if __name__ == "__main__":
-    # Verifica se o caminho do arquivo foi fornecido como argumento de linha de comando
-    if len(sys.argv) != 2:
-        print("Uso: python problema_da_mochila.py <caminho_para_o_arquivo_input>")
-        sys.exit(1)
     input_file = sys.argv[1]
-
-    # Leia o arquivo de entrada
-    n, m, capacities, items = read_input(input_file)
-
-    # Resolva o problema
-    mochila_inteira(n, m, capacities, items)
+    n, m, c, items = ler_input(input_file)
+    mochila_inteira(n, m, c, items)
